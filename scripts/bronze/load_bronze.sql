@@ -6,6 +6,11 @@ Script Purpose:
   This script loads given csv files to the datawarehouse
   The loading format used is "Truncate and Insert"
   Load times of datasets are calculated
+
+Parameters: None
+
+Execution: EXEC bronze.load_bronze
+
 */
 
 USE DataWarehouse;
