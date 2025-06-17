@@ -1,3 +1,11 @@
+/*
+=====================================================
+DDL SCRIPT FOR DATAWAREHOUSE
+=====================================================
+Script Purpose:
+	Create tables for the associated csv files
+	If tables exist, drop and remake them
+*/
 USE DataWarehouse;
 GO
 
