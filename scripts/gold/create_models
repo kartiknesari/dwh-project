@@ -1,0 +1,78 @@
+/*
+===================================================================================================
+GOLD LAYER DATA MODELING
+===================================================================================================
+
+Script Purpose: 
+	Create gold schema data models
+	Perform Data Integration and Data Aggregation
+	Create views
+
+Execution: EXEC gold.create_models
+*/
+USE DataWarehouse;
+GO
+
+CREATE OR ALTER VIEW gold.dim_customers AS
+SELECT  ROW_NUMBER() OVER (ORDER BY ci.cst_id) as customer_key
+        ,ci.cst_id as customer_id
+        ,ci.cst_key as customer_number
+        ,ci.cst_firstname as first_name
+        ,ci.cst_lastname as last_name
+        ,ci.cst_marital_status as marital_status
+        ,CASE WHEN ci.cst_gndr = 'n/a' AND ca.gen IS NOT NULL THEN ca.gen
+        ELSE ci.cst_gndr
+        END as gender
+        ,ci.cst_create_date as create_date
+        ,ca.bdate as birthdate
+        ,CASE WHEN la.cntry IS NULL THEN 'n/a'
+        ELSE la.cntry
+        END as country
+FROM silver.crm_cust_info AS ci
+LEFT JOIN silver.erp_cust_az12 AS ca 
+    ON ca.cid = ci.cst_key
+LEFT JOIN silver.erp_loc_a101 as la
+    ON la.cid = ci.cst_key;
+GO
+
+CREATE OR ALTER VIEW gold.dim_products AS
+SELECT  ROW_NUMBER() OVER (ORDER BY pf.prd_id) as product_key
+        ,pf.prd_id as product_number
+        ,pf.prd_key as product_id
+        ,pf.prd_nm as product_name
+        ,pf.prd_cat as category_id
+        ,CASE WHEN px.cat IS NULL AND pf.prd_cat LIKE 'CO%' THEN 'Components'
+        ELSE px.cat
+        END AS category
+        ,CASE WHEN px.subcat IS NULL AND pf.prd_cat LIKE '%PE' THEN 'Pedals'
+        ELSE px.subcat
+        END AS subcategory
+        ,CASE WHEN px.maintenance IS NULL THEN 'n/a'
+        ELSE px.maintenance
+        END AS maintenance
+        ,pf.prd_cost as cost
+        ,pf.prd_line as product_line
+        ,pf.prd_start_dt as sell_start_date
+FROM silver.crm_prd_info pf
+LEFT JOIN silver.erp_px_cat_g1v2 px
+    ON pf.prd_cat = px.id
+WHERE prd_end_dt IS NULL;       -- fetch only latest product, no historical data
+GO
+
+CREATE OR ALTER VIEW gold.fact_sales AS
+SELECT  ROW_NUMBER() OVER (ORDER BY sl.sls_ord_num, sl.sls_order_dt) as sales_key
+        ,sl.sls_ord_num as order_number
+        ,pd.product_key as product_key
+        ,cu.customer_key as customer_key
+        ,sl.sls_order_dt as order_date
+        ,sl.sls_ship_dt as shipping_date
+        ,sl.sls_due_dt as due_date
+        ,sl.sls_sales as total_price
+        ,sl.sls_quantity as quantity
+        ,sl.sls_price as price
+FROM silver.crm_sales_details sl
+LEFT JOIN gold.dim_customers cu
+    ON sl.sls_cust_id = cu.customer_id
+LEFT JOIN gold.dim_products pd
+    ON sl.sls_prd_key = pd.product_id;
+GO
