@@ -1,0 +1,16 @@
+/*
+=======================================================================
+GOLD SCHEMA VALIDATIONS
+=======================================================================
+
+Check for:
+	fact_sales: Successful join
+*/
+
+select *
+from gold.fact_sales fs
+LEFT JOIN gold.dim_customers dc
+	ON fs.customer_key = dc.customer_key
+LEFT JOIN gold.dim_products p
+	ON fs.product_key = p.product_key
+WHERE dc.customer_key is NULL OR p.product_key IS NULL;
