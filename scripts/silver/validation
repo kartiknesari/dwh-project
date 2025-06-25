@@ -1,0 +1,148 @@
+/*
+=======================================================================================================
+SILVER LAYER VALIDATION
+=======================================================================================================
+*/
+
+USE DataWarehouse;
+GO
+
+-- Table: crm_cust_info
+
+-- Columns: cst_id 
+-- Validation: Duplicate values, Null value
+select cst_id, COUNT(*) 
+from silver.crm_cust_info 
+group by cst_id 
+having COUNT(*) > 1 OR cst_id IS NULL;
+
+-- Columns: cst_key, cst_firstname, cst_lastname 
+-- Validation: whitespace check
+select * 
+from silver.crm_cust_info 
+where (
+	TRIM(cst_key) != cst_key OR
+	TRIM(cst_firstname) != cst_firstname OR 
+	TRIM(cst_lastname) != cst_lastname OR
+	TRIM(cst_marital_status) != cst_marital_status OR 
+	TRIM(cst_gndr) != cst_gndr
+);
+
+-- Table: crm_prd_info
+
+-- Column: prd_id
+-- Validation: Duplicate values, Null value
+-- Initial Check Result: OK
+select prd_id, COUNT(*) as prd_count
+from silver.crm_prd_info 
+group by prd_id 
+having COUNT(*) > 1 OR prd_id IS NULL;
+
+-- Column: prd_key
+-- Features: split into prd_cat (1 - 5) and prd_key (7 - end)
+-- Validations: Duplicate values, Null value, Whitespace
+select prd_key, COUNT(*) as prd_count
+from silver.crm_prd_info
+group by prd_key
+having COUNT(*) > 1 OR prd_key IS NULL OR prd_key != TRIM(prd_key);
+
+select *
+from silver.crm_prd_info
+where prd_key = 'AC-HE-HL-U509';
+
+GO
+
+-- Table: crm_prd_info
+select * from silver.crm_prd_info;
+
+-- Column: prd_id
+-- Validation: Duplicate values, Null value
+-- Observations: No duplicates, no nulls
+select prd_id, COUNT(*) as prd_count
+from silver.crm_prd_info 
+group by prd_id 
+having COUNT(*) > 1 OR prd_id IS NULL;
+
+/*
+Column: prd_key
+Validations: Null value, Whitespace
+Observations: 
+	Prior History, split into prd_cat (1 - 5) and prd_key (7 - end)
+	No NULLs, no whitespace issues
+*/
+select prd_cat, prd_key, COUNT(*) as prd_count
+from silver.crm_prd_info
+group by prd_cat, prd_key
+having prd_key IS NULL OR prd_key != TRIM(prd_key);
+
+-- Column: prd_nm
+-- Validation: Null, Whitespace
+-- Observation: No Null, No Whitespace
+select *
+from silver.crm_prd_info
+where prd_nm is NULL;
+
+-- Column: prd_cost
+-- Validation: Null value
+-- Observation: Null values detected
+select * 
+from silver.crm_prd_info
+where prd_cost is NULL OR prd_cost < 0;
+
+-- Column: prd_line
+-- Validation: Nulls, cardinality
+-- Observation: Nulls detected, Cardinality of 4
+select distinct prd_line 
+from silver.crm_prd_info;
+
+-- Column: prd_start_dt, prd_end_dt
+-- Validation: Nulls for Start date, start date < end date
+-- Observation: start date < end date
+select *
+from silver.crm_prd_info
+where prd_start_dt IS NULL OR prd_start_dt > prd_end_dt;
+GO
+
+-- Table: crm_sales_details
+
+-- sls_ord_num
+-- Validations: Whitespace, NULL
+select sls_ord_num 
+from silver.crm_sales_details
+where sls_ord_num != TRIM(sls_ord_num) OR sls_ord_num is NULL;
+
+-- sls_prd_key
+-- Validations: Whitespace, NULL, not in crm_prd_info
+select sls_prd_key
+from silver.crm_sales_details
+where	sls_prd_key != TRIM(sls_prd_key) or 
+		sls_prd_key is NULL or 
+		sls_prd_key NOT IN (
+			select prd_key from silver.crm_prd_info	
+);
+
+-- sls_cust_id
+-- Validations: NULL, not in crm_cust_info
+select sls_cust_id
+from silver.crm_sales_details
+where sls_cust_id NOT IN (
+		Select cst_id
+		from silver.crm_cust_info
+);
+
+select sls_cust_id
+from silver.crm_sales_details
+where sls_cust_id is NULL;
+
+-- sls_order_dt, sls_ship_dt, sls_due_dt
+-- Validations: inequality
+select *
+from silver.crm_sales_details
+where sls_ship_dt < sls_order_dt OR sls_due_dt < sls_order_dt;
+
+-- sls_sales, sls_quantity, sls_price
+-- Validations: NULL value, invalid date, inequality
+select sls_sales, sls_quantity, sls_price
+from silver.crm_sales_details
+where sls_sales != sls_quantity * sls_price
+	OR sls_sales <= 0 OR sls_price <= 0;
